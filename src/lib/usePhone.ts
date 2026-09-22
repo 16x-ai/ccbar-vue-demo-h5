@@ -69,6 +69,28 @@ function sipKeepaliveSeconds(): number {
   return Number.isFinite(value) && value >= 0 ? value : 600;
 }
 
+/**
+ * 环境自检：麦克风在「非安全上下文」里根本拿不到。
+ *
+ * 这是手机调试最常见的坑 —— 电脑上用 http://localhost:5174 一切正常（localhost 算安全上下文），
+ * 手机打开 http://192.168.x.x:5174 就不是了：navigator.mediaDevices 直接是 undefined，
+ * 表现成「能签入、点呼叫就失败」或者干脆没声音，而且报错里看不出原因。
+ * 提前把话说清楚，比事后翻 SIP 日志省事。
+ */
+function mediaEnvironmentHint(): string {
+  if (typeof window !== "undefined" && window.isSecureContext === false) {
+    return (
+      "当前页面不是安全上下文：浏览器不会给麦克风权限，呼叫必然失败。" +
+      "手机请用 https:// 打开（在 .env 里加 H5_HTTPS=1 后 npm run dev，首次需手动信任自签证书），" +
+      "详见 README「真机调试」。"
+    );
+  }
+  if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+    return "这个环境没有 navigator.mediaDevices.getUserMedia：请用 https（或 localhost）打开页面，或换一个浏览器。";
+  }
+  return "";
+}
+
 // 可选：WebPhone API 的基地址（新平台形态才用）。留空＝同源，由 Vite / nginx 转给平台。
 function webphoneBaseUrl(): string {
   return String(import.meta.env?.VITE_WEBPHONE_API_BASE || "")
@@ -590,6 +612,9 @@ export function usePhone() {
     // 必须在 SDK 第一次 connect（懒加载 JsSIP）之前打开 SIP 原文
     unsubscribeSipDebug = enableJsSipDebug((level, text) => appendPanelLog("sip", level, "jssip", text));
     document.addEventListener("visibilitychange", onVisibilityChange);
+    // 手机上打开 http://<局域网IP> 时先提示：这种环境下麦克风拿不到，呼叫一定失败
+    const mediaHint = mediaEnvironmentHint();
+    if (mediaHint) showError(mediaHint);
     try {
       client.value = createClient();
     } catch (error) {

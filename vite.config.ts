@@ -7,6 +7,39 @@ import basicSsl from "@vitejs/plugin-basic-ssl";
 import vue from "@vitejs/plugin-vue";
 import { defineConfig, loadEnv, searchForWorkspaceRoot, type Plugin } from "vite";
 
+// 逐跳（hop-by-hop）头：h1 里可以转发，h2 里是禁止的
+const DROP_HEADERS = new Set([
+  "connection",
+  "keep-alive",
+  "proxy-connection",
+  "transfer-encoding",
+  "upgrade",
+  "te",
+  "trailer",
+]);
+
+/**
+ * 把一份 Node 头对象整理成可以在 h1 / h2 之间搬运的样子：剔除伪头与逐跳头。
+ *
+ * 两个坑（都是 HTTPS 模式才暴露，因为 Vite 的 HTTPS dev server 是
+ * `http2.createSecureServer`（带 allowHTTP1），浏览器一上 https 就走 h2）：
+ *   1. 请求方向：h2 的 `req.headers` 带 `:method` / `:path` / `:authority` 伪头，
+ *      透传给 `http.request()` 会抛 `Header name must be a valid HTTP token [":method"]` → 接口 500。
+ *   2. 响应方向：h1 响应里的 `keep-alive` / `connection` 写回 h2 响应会抛
+ *      `ERR_HTTP2_INVALID_CONNECTION_HEADERS` —— 这是**未捕获异常，直接把 Vite 进程带崩**。
+ * 表现就是「http 打开一切正常，换成 https（手机必须 https）就 Internal server error / dev server 挂掉」。
+ */
+function forwardHeaders(source: Record<string, string | string[] | undefined>) {
+  const headers: Record<string, string | string[]> = {};
+  for (const [key, value] of Object.entries(source)) {
+    if (value === undefined) continue;
+    const name = key.toLowerCase();
+    if (name.startsWith(":") || DROP_HEADERS.has(name)) continue;
+    headers[name] = value;
+  }
+  return headers;
+}
+
 // 会话 / 坐席状态 / Token 三个接口由本仓库的 server/（token-server.js）提供，
 // npm run dev 会先在 127.0.0.1:3100 起它，再起页面并把地址通过 TOKEN_PROXY_ORIGIN 传进来。
 // 换成你们自己的后端时，把 TOKEN_PROXY_ORIGIN 改成你们的地址（或部署时直接反代，见 README）。
@@ -28,13 +61,14 @@ function tokenProxyPlugin(tokenOrigin: string): Plugin {
           return;
         }
         const target = new URL(url, tokenOrigin);
-        const headers = { ...req.headers, host: target.host };
-        delete headers.connection;
+        const headers = forwardHeaders(req.headers);
+        headers.host = target.host;
         const proxyReq = http.request(
           target,
           { method: req.method, headers },
           (proxyRes) => {
-            res.writeHead(proxyRes.statusCode || 500, proxyRes.headers);
+            // 响应方向同样要过滤：h1 的 keep-alive / connection 写进 h2 响应会直接抛异常
+            res.writeHead(proxyRes.statusCode || 500, forwardHeaders(proxyRes.headers));
             proxyRes.pipe(res);
           },
         );
