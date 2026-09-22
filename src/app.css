@@ -1,0 +1,581 @@
+/*
+ * H5 坐席条样式：配色与状态标签沿用桌面 demo（也就是参考页 D:\code\ccbar\index.html）的词汇，
+ * 布局按移动端重做：整屏不滚动、大触控区（≥48px）、底部安全区、拨号盘。
+ * 移动端三条硬要求写在下面每一处：字号 ≥16px 的输入框（iOS 不放大）、
+ * touch-action: manipulation（去掉双击缩放的延迟）、safe-area（刘海屏/小黑条）。
+ */
+
+:root {
+    --bg: #f3f4f6;
+    --paper: #ffffff;
+    --line: #d9dde3;
+    --ink: #1a1d23;
+    --muted: #5c6370;
+    --label: #8a9099;
+    --blue: #1864ab;
+    --green: #2b8a3e;
+    --green-soft: #e6f4ea;
+    --amber: #c77c02;
+    --amber-soft: #fff4d6;
+    --red: #c92a2a;
+    --red-soft: #fde8e8;
+    --gray: #868e96;
+    --gray-soft: #eef0f2;
+    /* 拨号盘键大小：跟着屏宽走，最小保证 48px 触控区 */
+    --key: clamp(48px, 13.5vw, 68px);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.45 "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    -webkit-text-size-adjust: 100%;
+}
+
+button, input {
+    font-family: inherit;
+    /* 双击不缩放、点按无延迟；iOS 上不闪灰色高亮 */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+button { user-select: none; }
+
+/* ── 整屏骨架：页面本身不滚动，只有中间的拨号区在空间不够时内部滚 ─────────────── */
+
+.h5 {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    padding: calc(8px + env(safe-area-inset-top)) 14px 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+}
+
+.h5-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 34px;
+}
+
+.h5-brand strong { font-size: 16px; font-weight: 600; }
+.h5-brand span { color: var(--label); font-size: 12px; }
+
+.h5-head-right { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+.h5-chip {
+    display: inline-flex;
+    align-items: center;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: var(--gray-soft);
+    color: var(--ink);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.h5-chip b { margin-left: 3px; font-weight: 600; }
+
+.h5-gear {
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--ink);
+    font-size: 13px;
+}
+
+/* ── 状态标签（词汇与桌面 demo 一致）───────────────────────────────────────── */
+
+.h5-rails {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0 2px;
+}
+
+.ccbar_status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    background: var(--gray-soft);
+    color: var(--gray);
+}
+
+.ccbar_status::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.ccbar_work_status_offline,
+.ccbar_sip_status_unreg { background: var(--gray-soft); color: var(--gray); }
+.ccbar_work_status_online,
+.ccbar_serv_status_idle,
+.ccbar_sip_status_reg { background: var(--green-soft); color: var(--green); }
+.ccbar_work_status_busy,
+.ccbar_serv_status_busy,
+.ccbar_serv_status_calling { background: var(--red-soft); color: var(--red); }
+.ccbar_serv_status_talking { background: var(--green-soft); color: var(--green); }
+.ccbar_work_status_reset { background: var(--amber-soft); color: var(--amber); }
+
+/* ── 中间：号码 / 对方号码 + 拨号盘 ────────────────────────────────────────── */
+
+.h5-main {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    min-height: 0;             /* 允许 flex 收缩，空间不够时给下面的 overflow 生效 */
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 10px 0 4px;
+}
+
+.h5-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    min-height: 62px;
+}
+
+.h5-number {
+    width: 100%;
+    max-width: 320px;
+    height: 44px;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    background: transparent;
+    color: var(--ink);
+    font-size: 24px;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    letter-spacing: 1px;
+}
+
+.h5-number::placeholder { color: var(--label); font-size: 17px; letter-spacing: 0; }
+.h5-number:focus { outline: none; border-bottom-color: var(--blue); }
+
+.h5-destination {
+    font-size: 26px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 1px;
+    word-break: break-all;
+    text-align: center;
+}
+
+.h5-destination-sub { color: var(--muted); font-size: 13px; }
+
+.h5-modes { display: inline-flex; gap: 6px; }
+
+.h5-mode {
+    height: 30px;
+    padding: 0 14px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.h5-mode.is-on {
+    border-color: var(--blue);
+    background: var(--blue);
+    color: #fff;
+}
+
+/* 拨号盘：3×4，键是圆形虚拟键盘的样子，带字母副标 */
+.h5-dialpad {
+    display: grid;
+    grid-template-columns: repeat(3, var(--key));
+    justify-content: center;
+    gap: clamp(6px, 2vw, 12px);
+}
+
+.h5-key {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: var(--key);
+    height: var(--key);
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: #fff;
+    color: var(--ink);
+    padding: 0;
+    box-shadow: 0 1px 2px rgba(26, 29, 35, 0.04);
+}
+
+.h5-key:active:not(:disabled) { background: var(--gray-soft); }
+.h5-key:disabled { opacity: 0.45; }
+
+.h5-key-digit {
+    font-size: calc(var(--key) * 0.34);
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+}
+
+.h5-key-letters {
+    font-size: calc(var(--key) * 0.15);
+    color: var(--label);
+    letter-spacing: 0.5px;
+}
+
+.h5-edit { display: flex; gap: 18px; }
+
+.h5-edit-btn {
+    height: 34px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.h5-edit-btn:disabled { opacity: 0.4; }
+
+/* ── 底部：主操作 + 坐席状态（贴底，吃安全区）──────────────────────────────── */
+
+.h5-foot {
+    flex: 0 0 auto;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+}
+
+.h5-primary { display: flex; gap: 10px; }
+
+.h5-btn {
+    flex: 1;
+    min-height: 52px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: #fff;
+    color: var(--ink);
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.h5-btn:disabled { opacity: 0.45; }
+
+.h5-btn.is-call { border-color: var(--blue); background: var(--blue); color: #fff; }
+.h5-btn.is-call:active:not(:disabled) { background: #155698; }
+.h5-btn.is-mute { flex: 0 0 34%; border-color: var(--line); background: var(--gray-soft); color: var(--ink); font-weight: 500; }
+.h5-btn.is-danger { border-color: #f1c0c0; background: var(--red-soft); color: var(--red); }
+.h5-btn.is-answer { border-color: #b7e0c0; background: var(--green-soft); color: var(--green); }
+
+.h5-seat {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.h5-seat-btn {
+    min-height: 40px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--ink);
+    font-size: 14px;
+}
+
+.h5-seat-btn:disabled { opacity: 0.45; }
+.h5-seat-btn.is-quiet { color: var(--muted); }
+
+.h5-error {
+    flex: 0 0 auto;
+    margin-top: 8px;
+    color: var(--red);
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 4.6em;
+    overflow-y: auto;
+}
+
+/* ── 日志抽屉：默认收起一行，展开后自己滚 ────────────────────────────────── */
+
+.h5-log {
+    flex: 0 0 auto;
+    margin: 10px -14px 0;
+    border-top: 1px solid var(--line);
+    background: var(--paper);
+}
+
+.h5-log-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+}
+
+.h5-log-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+    min-height: 40px;
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    font-size: 13px;
+    text-align: left;
+}
+
+.h5-log-caret { color: var(--label); }
+
+.h5-log-latest {
+    flex: 1;
+    min-width: 0;
+    color: var(--label);
+    font-size: 11px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.h5-log-tabs {
+    display: flex;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.h5-log-tabs button {
+    min-height: 30px;
+    padding: 0 12px;
+    border: 0;
+    background: #fff;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.h5-log-tabs button[aria-selected="true"] { background: var(--ink); color: #fff; }
+
+.h5-log-clear {
+    min-height: 30px;
+    padding: 0 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--ink);
+    font-size: 12px;
+}
+
+.h5-log-body {
+    max-height: 34vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 8px 14px 12px;
+    border-top: 1px solid var(--line);
+    background: #f7f8fa;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    word-break: break-all;
+}
+
+.log-line + .log-line { margin-top: 4px; }
+.log-time { color: var(--label); margin-right: 6px; }
+.log-src { color: var(--blue); margin-right: 6px; }
+.log-line.ok .log-msg { color: var(--green); }
+.log-line.warn .log-msg { color: var(--amber); }
+.log-line.error .log-msg { color: var(--red); }
+
+/* ── 设置：底部整屏抽屉（输入框 16px，iOS 不会自动放大）────────────────────── */
+
+.h5-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 2100;
+    display: flex;
+    align-items: flex-end;
+    background: rgba(0, 0, 0, 0.45);
+}
+
+.h5-sheet-panel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-height: 92vh;
+    border-radius: 16px 16px 0 0;
+    background: #fff;
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+.h5-sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+}
+
+.h5-sheet-head h3 { margin: 0; font-size: 16px; }
+
+.h5-sheet-link {
+    min-width: 56px;
+    min-height: 36px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 15px;
+}
+
+.h5-sheet-link.is-primary { color: var(--blue); font-weight: 600; }
+
+.h5-sheet-body {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 6px 16px 20px;
+}
+
+.h5-sheet-body label {
+    display: block;
+    margin: 14px 0 6px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.h5-sheet-body input {
+    width: 100%;
+    height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--ink);
+    /* 16px：小于它 iOS Safari 会在聚焦时把整个页面放大 */
+    font-size: 16px;
+}
+
+.h5-sheet-body input:focus { outline: none; border-color: var(--blue); }
+
+.h5-hint {
+    margin: 10px 0 0;
+    color: var(--label);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.h5-hint code { font-family: ui-monospace, Consolas, monospace; }
+
+/* ── 来电：全屏浮层，两个大按钮 ──────────────────────────────────────────── */
+
+.h5-incoming {
+    position: fixed;
+    inset: 0;
+    z-index: 2200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.72);
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+}
+
+.h5-incoming-panel { width: 100%; max-width: 420px; }
+
+.h5-incoming-count {
+    margin-bottom: 10px;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 13px;
+    text-align: center;
+}
+
+.h5-incoming-item {
+    margin-bottom: 12px;
+    padding: 20px 16px;
+    border-radius: 16px;
+    background: #fff;
+    text-align: center;
+}
+
+.h5-incoming-item:last-child { margin-bottom: 0; }
+
+.h5-incoming-number {
+    margin-bottom: 18px;
+    font-size: 24px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    word-break: break-all;
+}
+
+.h5-incoming-btns { display: flex; gap: 12px; }
+
+/* ── 全屏加载：签入、设置坐席状态 ─────────────────────────────────────────── */
+
+.h5-loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(1px);
+}
+
+.h5-loading-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 20px;
+    border-radius: 12px;
+    background: var(--paper);
+    box-shadow: 0 8px 24px rgba(26, 29, 35, 0.18);
+    font-size: 14px;
+}
+
+.h5-loading-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--line);
+    border-top-color: var(--blue);
+    border-radius: 50%;
+    animation: h5-spin 0.8s linear infinite;
+}
+
+@keyframes h5-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* 用户在系统里关掉动画时，用一个静态圆点代替转动 */
+@media (prefers-reduced-motion: reduce) {
+    .h5-loading-spinner { animation: none; border-top-color: var(--blue); }
+}
+
+/* 横屏/大屏（平板、桌面浏览器调试）时别把拨号盘拉得太大 */
+@media (min-width: 560px) {
+    .h5 { padding-left: 20px; padding-right: 20px; }
+    .h5-log { margin-left: -20px; margin-right: -20px; }
+    .h5-main { gap: 18px; }
+}

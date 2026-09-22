@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- viewport-fit=cover：给 iPhone 的刘海/底部小黑条留出安全区（CSS 里用 env(safe-area-inset-*) 消费） -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#1864ab" />
+    <!-- 加到主屏后按独立窗口打开（演示用；正式接入一般跑在自家 App 的 WebView 里） -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>CC Bar H5 嵌入示例</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

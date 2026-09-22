@@ -1,0 +1,32 @@
+{
+  "name": "ccbar-vue-demo-h5",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "dev": "node server/dev.mjs",
+    "dev:vite": "vite",
+    "token-server": "node server/token-server.js",
+    "build": "vue-tsc -b && vite build",
+    "typecheck": "vue-tsc -b --pretty false",
+    "test": "node --test tests/*.test.ts",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@16x/webphone-sdk": "^3.1.3",
+    "vue": "^3.5.42"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@vitejs/plugin-basic-ssl": "^2.1.0",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "@vue/compiler-sfc": "^3.5.42",
+    "@vue/tsconfig": "^0.9.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0",
+    "vue-tsc": "^3.3.11"
+  }
+}
