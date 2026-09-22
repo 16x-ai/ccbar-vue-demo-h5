@@ -45,9 +45,32 @@ npm run dev
 3. **来电振动**：`call.incoming` 时 `navigator.vibrate([200, 100, 200])`（iOS Safari 不支持，静默忽略）。
 4. **安全区与触控**：`viewport-fit=cover` + `env(safe-area-inset-*)`；主按钮 ≥ 48px，输入框字号 16px（iOS 聚焦时不会放大页面），`touch-action: manipulation` 去掉双击缩放延迟。
 
-## platform 传的是 mobile-web
+## platform 用 'mobile-web'，来电靠会话里的开关
 
-`createClient()` 里写死 `platform: 'mobile-web'`（`src/lib/usePhone.ts`）：SDK 会按移动端形态请求会话（请求体里是 `platform: "mobile_web"`），移动端默认请求的能力是 `outbound / mute / dtmf`。不传的话 SDK 会自己探测（结果一样），写死是为了让行为确定、排障时少一个变量。
+`createClient()` 里显式写 `platform: 'mobile-web'`（`src/lib/usePhone.ts`）：移动端形态下并发压到
+1 路、不提供 `hold` / `blind_transfer`——和这个页面的 UI 正好对上（移动版没有保持/转接）。
+
+**来电必须在会话里把 `policy.mobileIncomingEnabled` 打开**（SDK **3.1.4** 起支持）：
+
+```js
+policy: {
+  incomingEnabled: true,
+  mobileIncomingEnabled: true,   // ← 少这一行，来电会被拒
+}
+```
+
+不打开（`false` 或缺省）时，SDK 会把会话能力里的 `inbound` 删掉（`CallManager.effectiveCapabilities`），
+收到 INVITE 就命中「能力不支持」分支直接终止 —— 表现是**自己能打出去、别人打不进来**，
+主叫那边只会看到平台转出来的 `480 Temporarily Unavailable`（`Q.850;cause=16`），
+页面连来电浮层都不弹。本仓库的 `server/get-session.js` 已经打开这个开关。
+
+> `platform` 不传时 `detectPlatform()` 命中 `iPhone|iPad|Android` 也会自动选 `mobile-web`，
+> 所以手机浏览器默认就落在这个形态里——上面这个开关因此是**必须**的，不是可选优化。
+>
+> 如果这个页面需要接来电 + 保持 + 转接的全套能力，把 `platform` 改成 `'web'` 也可以（那就绕开移动端策略）。
+
+3.1.4 之前的 SDK 在 mobile-web 下无条件删 `inbound`，即手机网页**永远收不到来电**；
+本仓库的依赖已经升到 `^3.1.4`。
 
 ## 会话从哪来
 

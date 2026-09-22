@@ -219,9 +219,12 @@ export async function getLegacySession({
     // STUN 地址按平台下发的 turnIp:turnPort 拼，没给端口时用 3478
     iceServers: turnIp ? [{ urls: [`stun:${turnIp}:${turnPort}`] }] : [],
     policy: {
+      // mobile-web 形态下 SDK 会把并发压到 1；这个值只对 web 形态有意义，保留 2 与桌面版一致
       maxConcurrentCalls: 2,
       incomingEnabled: true,
-      mobileIncomingEnabled: false,
+      // 移动端（platform: 'mobile-web'）能不能接来电：必须为 true，否则 SDK 会删掉 inbound 能力，
+      // 来电会被直接拒掉（页面不弹浮层，主叫收到平台转的 480 / Q.850 cause=16）。
+      mobileIncomingEnabled: true,
       backgroundCallingSupported: false,
     },
     capabilities: [...CAPABILITIES],

@@ -2,7 +2,8 @@
  * H5 页面的全部逻辑：签入 / 通话 / 拨号盘 / 日志 / 状态。
  *
  * 业务逻辑与桌面版（D:\code\ccbar-vue-demo\src\lib\usePhone.ts）保持一致，只差三处：
- *   1. 建客户端时 platform 传 'mobile-web'（SDK 按移动端形态请求会话）；
+ *   1. 建客户端时 platform 传 'mobile-web'（并发 1 路、无保持/转接；**来电要靠会话里的
+ *      policy.mobileIncomingEnabled = true 打开**，SDK 3.1.4 起支持，详见 createClient 里的注释）；
  *   2. 不做 保持 / 恢复 / 转接（移动端形态用不上），改做 静音 / DTMF / 拨号盘输入；
  *   3. 补上移动端特有的三件事：音频解锁（iOS 自动播放策略）、屏幕常亮（通话时别锁屏）、来电振动。
  *
@@ -553,7 +554,15 @@ export function usePhone() {
     const baseUrl = webphoneBaseUrl();
     const options: CCBarClientOptions = {
       locale: "zh-CN",
-      // H5：按移动端形态建会话（不传的话 SDK 自己探测，传了就固定下来）
+      // H5 用移动端形态：并发压到 1 路、不提供 保持 / 转接（移动 UI 上本来也没有这两个操作）。
+      //
+      // 关键：**来电必须在会话里 policy.mobileIncomingEnabled = true**（SDK 3.1.4 起支持）。
+      // 不打开的话 SDK 会把 inbound 能力删掉，来电直接被终止、页面连浮层都不弹，
+      // 主叫那边只会看到平台转出来的 480 Temporarily Unavailable（Q.850 cause=16）——
+      // 也就是「自己能打出去、别人打不进来」。会话由本仓库 server/get-session.js 拼，那边已经打开。
+      //
+      // 另外注意：platform 不传时 detectPlatform() 命中 iPhone|iPad|Android 也会自动选 mobile-web，
+      // 手机浏览器上会默认落进这个形态，所以这里显式写死，行为可预期。
       platform: "mobile-web",
       sipKeepaliveSeconds: sipKeepaliveSeconds(),
       ...(baseUrl ? { baseUrl } : {}),
