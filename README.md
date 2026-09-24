@@ -28,7 +28,7 @@ npm run dev
 |---|---|
 | 签入 / 退签 | `client.connect({ extension })` / `client.disconnect()`；签入期间申请屏幕常亮，退签释放 |
 | 拨号盘 | 通话前输入号码；**通话中送 DTMF**（`call.sendDtmf(tone)`） |
-| 外呼 / 内呼 | 号码上方切换；内呼会先把企业前缀拼在号码前（旧平台约定，与参考实现 `insideCall` 一致） |
+| 外呼 / 内呼 | 号码上方切换；内呼会先把企业前缀拼在号码前（与参考实现 `insideCall` 一致） |
 | 呼叫 | `client.dial({ destination })` |
 | 静音 | `call.mute()` / `call.unmute()`（只在接通后可点） |
 | 挂断 | `call.hangup()` |
@@ -74,27 +74,27 @@ policy: {
 
 ## 会话从哪来
 
-默认旧平台形态，与桌面 demo 完全一致：
+与桌面 demo 完全一致，由服务端拼好会话后交给 SDK（`sessionProvider`）：
 
 ```
 页面 ──POST /get-session──▶ dev 代理 ──▶ TOKEN_PROXY_ORIGIN（默认 127.0.0.1:3100）
                                             └── server/get-session.js
                                                 token/fs → seat/account/get → 解出 SIP 密码 → 拼 WSS
+页面 ◀── 返回一份完整的 WebPhoneSession ─┘
+页面 ──sessionProvider.createSession()──▶ SDK ──▶ 连 WSS、发 REGISTER（注册分机）
 ```
 
 - **换地址**：`.env` 里 `TOKEN_PROXY_ORIGIN=https://你们的网关`；或让页面直连你们自己的后端，用 `VITE_SESSION_API` / `VITE_AGENT_STATUS_API`（需要对方开 CORS 并允许携带 Cookie）。
-- **切新平台形态**：`VITE_LEGACY_PLATFORM=0` + `WEBPHONE_PROXY_TARGET`（网关要有 `/webphone/v1/*`）。
 - **接口契约、AES 解密、部署反代、排障表**都写在桌面 demo 的文档里：`D:\code\ccbar-vue-demo\docs\前端接入文档.md`。两边共用同一套契约，这里不重复，只写 H5 的差异。
 
 ## 部署
 
 `npm run build` 产出纯静态 `dist\`。上线时**必须 HTTPS**，并且同源反代：
 
-| 路径 | 转发到 | 什么时候用 |
-|---|---|---|
-| `/get-session` | 本仓库的 `server/token-server.js`（`npm run token-server`，或你们自己的会话服务） | 默认形态（旧平台） |
-| `/set-agent-status` | 同上（空闲 / 置忙 / 休息 / 退签） | 默认形态（旧平台） |
-| `/get-token`、`/webphone/v1/*` | 平台的签发 / WebPhone API | 只有新平台形态时 |
+| 路径 | 转发到 |
+|---|---|
+| `/get-session` | 本仓库的 `server/token-server.js`（`npm run token-server`，或你们自己的会话服务） |
+| `/set-agent-status` | 同上（空闲 / 置忙 / 休息 / 退签） |
 
 ## 已知环境行为
 
@@ -114,13 +114,13 @@ src/App.vue              整屏骨架：状态条 + 号码/拨号盘 + 主操作
 src/components/          Dialpad / SettingsDialog / LogPanel / IncomingCallModal / LoadingOverlay
 src/lib/usePhone.ts      页面逻辑（含移动端三件事：音频解锁、屏幕常亮、来电振动）
 src/lib/callRetry.ts     首通保护：重拨节奏与额度（纯函数，有单测）
-src/lib/session.ts       会话来源（默认 sessionProvider）+ 坐席状态
+src/lib/session.ts       会话来源（sessionProvider）+ 坐席状态
 src/lib/settings.ts      设置读、校验、写 localStorage
 src/lib/sipDebug.ts      SIP 原文：打开 JsSIP debug 并接住 console
 src/lib/logs.ts          日志格式化与状态文案（纯函数，有单测）
 src/lib/helpers.ts       地址校验、分机前缀处理
 server/dev.mjs           一次起两个进程：Token 代理(3100) + Vite(5174)
-server/token-server.js   HTTP 服务：/get-session、/set-agent-status、/get-token、/health
+server/token-server.js   HTTP 服务：/get-session、/set-agent-status、/health
 server/get-session.js    token/fs → seat/account/get → 解出 SIP 密码 → 拼会话
 server/get-token.js      fs token（X-Ca 签名 + 缓存）
 server/set-agent-status.js  坐席状态 → 平台 seats/set-status

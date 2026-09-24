@@ -45,9 +45,7 @@ function forwardHeaders(source: Record<string, string | string[] | undefined>) {
 // 换成你们自己的后端时，把 TOKEN_PROXY_ORIGIN 改成你们的地址（或部署时直接反代，见 README）。
 function tokenProxyPlugin(tokenOrigin: string): Plugin {
   const prefixes = [
-    "/api/xcall/webphone-token",
     "/ccbar/",
-    "/get-token",
     "/get-session",
     "/set-agent-status",
   ];
@@ -114,13 +112,6 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const tokenOrigin =
     process.env.TOKEN_PROXY_ORIGIN || env.TOKEN_PROXY_ORIGIN || "http://127.0.0.1:3100";
-  // 新平台形态才用得到（页面直连 /webphone/v1/*）；旧平台形态留空即可
-  const webphoneTarget = process.env.WEBPHONE_PROXY_TARGET || env.WEBPHONE_PROXY_TARGET;
-  const apiPrefix = (
-    process.env.WEBPHONE_API_PREFIX ||
-    env.WEBPHONE_API_PREFIX ||
-    "/webphone"
-  ).replace(/\/+$/, "");
   // 真机调试要 HTTPS：getUserMedia（麦克风）只在安全上下文里可用，
   // 用 http://<局域网IP>:5174 打开手机页面会直接拿不到麦克风。
   //   H5_HTTPS=1 npm run dev   → 自签名证书，手机首次打开要点「继续访问」
@@ -175,20 +166,6 @@ export default defineConfig(({ mode }) => {
       fs: {
         allow: [searchForWorkspaceRoot(process.cwd()), sdkRoot],
       },
-      ...(webphoneTarget
-        ? {
-            proxy: {
-              "/webphone": {
-                target: webphoneTarget,
-                changeOrigin: true,
-                ws: true,
-                rewrite: (requestPath: string) =>
-                  requestPath.replace(/^\/webphone/, apiPrefix),
-              },
-              "/openapi": { target: webphoneTarget, changeOrigin: true, ws: true },
-            },
-          }
-        : {}),
     },
   };
 });

@@ -27,9 +27,7 @@ import {
 import type { AgentState, CallState, ConnectionState, LogLevel, LogLine, LogPanel } from "./logs";
 import {
   SEAT_STATUS_TEXT,
-  createLegacySessionProvider,
-  createTokenProvider,
-  isLegacyPlatform,
+  createSessionProvider,
   setSeatStatus,
 } from "./session";
 import type { SeatAccount } from "./session";
@@ -91,13 +89,6 @@ function mediaEnvironmentHint(): string {
   return "";
 }
 
-// 可选：WebPhone API 的基地址（新平台形态才用）。留空＝同源，由 Vite / nginx 转给平台。
-function webphoneBaseUrl(): string {
-  return String(import.meta.env?.VITE_WEBPHONE_API_BASE || "")
-    .trim()
-    .replace(/\/+$/, "");
-}
-
 // 屏幕常亮：手机息屏会掐掉音频，签入期间申请一把，退签时释放。
 type WakeLockSentinel = { release: () => Promise<void> };
 type WakeLockApi = { request: (type: "screen") => Promise<WakeLockSentinel> };
@@ -149,9 +140,7 @@ export function usePhone() {
   /** 最近一次拨出去的号码与时间：用来认领 call.failed 是不是我们这通外呼 */
   let lastDialTarget = "";
   let lastDialAt = 0;
-  /** 网关是旧平台还是新平台（构建时决定，见 session.ts） */
-  const legacyPlatform = isLegacyPlatform();
-  /** 旧平台的坐席前缀（customerPrefix）：标题栏要和分机一起显示，内呼时也要拼在号码前 */
+  /** 坐席前缀（customerPrefix）：标题栏要和分机一起显示，内呼时也要拼在号码前 */
   const customerPrefix = ref("");
   /** 平台认的坐席账号（取回会话后才知道，可能带企业前缀）；置忙 / 退签要用它 */
   let seatAccount = config.extension;
@@ -329,7 +318,7 @@ export function usePhone() {
     // 取会话 → 连 WSS → REGISTER 要几秒，期间盖全屏遮罩，别让人以为卡住了
     loading.value = "正在签入…";
     try {
-      await instance.connect({ extension: config.extension });
+      await instance.connect();
     } finally {
       loading.value = "";
     }
@@ -341,12 +330,10 @@ export function usePhone() {
     await client.value?.disconnect();
     // 与旧版一致：退签时把坐席置为「退出登录」，否则平台上还挂着这个坐席。
     // 只是告知平台，失败不阻塞退签（页面状态照旧清空）
-    if (legacyPlatform) {
-      const [status, reason] = SEAT_STATUS_TEXT.offline;
-      void setSeatStatus(config, seatAccount, status, reason, appendFlowLog).catch((error: unknown) => {
-        appendFlowLog("warn", "seat", `置离线失败：${error instanceof Error ? error.message : error}`);
-      });
-    }
+    const [status, reason] = SEAT_STATUS_TEXT.offline;
+    void setSeatStatus(config, seatAccount, status, reason, appendFlowLog).catch((error: unknown) => {
+      appendFlowLog("warn", "seat", `置离线失败：${error instanceof Error ? error.message : error}`);
+    });
     connection.value = "offline";
     agent.value = "offline";
     callState.value = "idle";
@@ -365,7 +352,7 @@ export function usePhone() {
   async function startCall(destination: string, extensionCall = false) {
     const instance = client.value;
     if (!instance) throw new Error("请先签入");
-    const target = extensionCall && legacyPlatform ? prefixExtension(destination, customerPrefix.value) : destination;
+    const target = extensionCall ? prefixExtension(destination, customerPrefix.value) : destination;
     // 记下这一通是谁、什么时候拨的：call.failed 来得太晚就不认（可能是别的通话失败了）
     lastDialTarget = target;
     lastDialAt = Date.now();
@@ -376,9 +363,7 @@ export function usePhone() {
       `${extensionCall ? "内呼" : "外呼"} ${target}${note}（话机连接=${connection.value}）`,
     );
     muted.value = false;
-    await instance.dial(
-      extensionCall && !legacyPlatform ? { destination, type: "extension" } : { destination: target },
-    );
+    await instance.dial({ destination: target });
   }
 
   /** 用户点「呼叫」：先停掉上一轮还没走完的重拨时间点，再按当前 外呼/内呼 拨出去 */
@@ -458,10 +443,6 @@ export function usePhone() {
    * 所以页面直接调服务端的坐席状态接口（平台侧是 On Break + reason=忙碌）。
    */
   async function setBusy() {
-    if (!legacyPlatform) {
-      showError("新平台形态请在平台侧管理坐席状态（当前 SDK 只提供 空闲 / 休息）");
-      return;
-    }
     const [status, reason] = SEAT_STATUS_TEXT.busy;
     loading.value = "正在设置坐席状态…";
     try {
@@ -573,7 +554,6 @@ export function usePhone() {
 
   // ---------- 客户端生命周期 ----------
   function createClient(): CCBarClient {
-    const baseUrl = webphoneBaseUrl();
     const options: CCBarClientOptions = {
       locale: "zh-CN",
       // H5 用移动端形态：并发压到 1 路、不提供 保持 / 转接（移动 UI 上本来也没有这两个操作）。
@@ -587,25 +567,20 @@ export function usePhone() {
       // 手机浏览器上会默认落进这个形态，所以这里显式写死，行为可预期。
       platform: "mobile-web",
       sipKeepaliveSeconds: sipKeepaliveSeconds(),
-      ...(baseUrl ? { baseUrl } : {}),
       // 单标签页，不用 SharedWorker
       sharedWorker: { enabled: false, fallback: "single-tab" },
     };
-    if (legacyPlatform) {
-      // 旧平台：会话由服务端拼好（桌面 demo 的 server/get-session.js）
-      const provider = createLegacySessionProvider(config, appendFlowLog, (account: SeatAccount) => {
-        customerPrefix.value = String(account.customerPrefix || "");
-        seatAccount = String(account.username || seatAccount);
-        appendFlowLog(
-          "ok",
-          "seat",
-          `坐席账号就绪 ${stringifyLog({ username: account.username, prefix: account.customerPrefix || "-" })}`,
-        );
-      });
-      return new CCBarClient({ ...options, sessionProvider: provider });
-    }
-    // 新平台：SDK 拿 token 去换会话
-    return new CCBarClient({ ...options, tokenProvider: createTokenProvider(config, appendFlowLog) });
+    // 会话由服务端拼好（桌面 demo 的 server/get-session.js）
+    const provider = createSessionProvider(config, appendFlowLog, (account: SeatAccount) => {
+      customerPrefix.value = String(account.customerPrefix || "");
+      seatAccount = String(account.username || seatAccount);
+      appendFlowLog(
+        "ok",
+        "seat",
+        `坐席账号就绪 ${stringifyLog({ username: account.username, prefix: account.customerPrefix || "-" })}`,
+      );
+    });
+    return new CCBarClient({ ...options, sessionProvider: provider });
   }
 
   function mount() {
