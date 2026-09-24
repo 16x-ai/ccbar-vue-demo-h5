@@ -26,7 +26,7 @@ npm run dev
 
 | 操作 | 行为 |
 |---|---|
-| 签入 / 退签 | `client.connect({ extension })` / `client.disconnect()`；签入期间申请屏幕常亮，退签释放 |
+| 签入 / 退签 | `client.connect()` / `client.disconnect()`；签入期间申请屏幕常亮，退签释放 |
 | 拨号盘 | 通话前输入号码；**通话中送 DTMF**（`call.sendDtmf(tone)`） |
 | 外呼 / 内呼 | 号码上方切换；内呼会先把企业前缀拼在号码前（与参考实现 `insideCall` 一致） |
 | 呼叫 | `client.dial({ destination })` |
@@ -70,7 +70,7 @@ policy: {
 > 如果这个页面需要接来电 + 保持 + 转接的全套能力，把 `platform` 改成 `'web'` 也可以（那就绕开移动端策略）。
 
 3.1.4 之前的 SDK 在 mobile-web 下无条件删 `inbound`，即手机网页**永远收不到来电**；
-本仓库的依赖已经升到 `^3.1.4`。
+本仓库依赖 `@16x/webphone-sdk` 4.x（这些能力都在）。
 
 ## 会话从哪来
 
@@ -85,7 +85,7 @@ policy: {
 ```
 
 - **换地址**：`.env` 里 `TOKEN_PROXY_ORIGIN=https://你们的网关`；或让页面直连你们自己的后端，用 `VITE_SESSION_API` / `VITE_AGENT_STATUS_API`（需要对方开 CORS 并允许携带 Cookie）。
-- **接口契约、AES 解密、部署反代、排障表**都写在桌面 demo 的文档里：`D:\code\ccbar-vue-demo\docs\前端接入文档.md`。两边共用同一套契约，这里不重复，只写 H5 的差异。
+- **接口契约、AES 解密、部署反代、排障表**都写在桌面 demo 的文档里：`D:\code\ccbar-vue-demo\docs\前端接入文档.md`；两条平台接口的加签与拼装细节见本仓库 `docs/会话服务实现指南.md`。两边共用同一套契约，这里不重复，只写 H5 的差异。
 
 ## 部署
 
