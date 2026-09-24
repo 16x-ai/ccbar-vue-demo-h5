@@ -85,7 +85,7 @@ policy: {
 ```
 
 - **换地址**：`.env` 里 `TOKEN_PROXY_ORIGIN=https://你们的网关`；或让页面直连你们自己的后端，用 `VITE_SESSION_API` / `VITE_AGENT_STATUS_API`（需要对方开 CORS 并允许携带 Cookie）。
-- **接口契约、AES 解密、部署反代、排障表**都写在桌面 demo 的文档里：`D:\code\ccbar-vue-demo\docs\前端接入文档.md`；两条平台接口的加签与拼装细节见本仓库 `docs/会话服务实现指南.md`。两边共用同一套契约，这里不重复，只写 H5 的差异。
+- **接口契约、AES 解密、部署反代、排障表**都写在桌面 demo 的文档里：`D:\code\ccbar-vue-demo\docs\前端接入文档.md`；两条平台接口的加签与拼装细节见本仓库 `docs/会话服务实现指南.md`，后端这段逻辑怎么组织见 `docs/会话服务后端逻辑.md`。两边共用同一套契约，这里不重复，只写 H5 的差异。
 
 ## 部署
 
