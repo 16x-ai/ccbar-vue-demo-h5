@@ -153,6 +153,9 @@ export async function getLegacySession({
   });
   const username = String(seat.username || seat.account || extension || "").trim();
   if (!username) throw new Error("坐席账号里没有 username");
+  // 必须在服务端解出明文：SDK 4.x 的客户端核心不再像 3.1.x 那样在会话入口自动解密
+  // registerTicket（4.x 会把 registerTicket 原样当 SIP 密码交给 JsSIP）。
+  // 桌面版 demo（SDK 3.1.x）可以原样转发密文，这里不行——所以解密仍留在服务端。
   const password = await decryptSeatPassword(seat.password);
   if (!password) throw new Error("坐席账号里的 password 解密后为空");
   // 排障用：只打「长度 + 加盐哈希前 8 位」，不打印密码本身。
@@ -195,7 +198,8 @@ export async function getLegacySession({
       id: username,
       externalUserId: username,
       displayName: username,
-      extension: username,
+      // 会话里坐席 extension 用请求带的分机号（用户填的），不用账号名
+      extension: extension,
       status: "Available",
     },
     sip: {

@@ -47,6 +47,7 @@ function tokenProxyPlugin(tokenOrigin: string): Plugin {
   const prefixes = [
     "/ccbar/",
     "/get-session",
+    "/get-token",
     "/set-agent-status",
   ];
   return {

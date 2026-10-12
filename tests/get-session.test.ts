@@ -115,6 +115,8 @@ test("拼出 SDK 能用的会话：注册密码是解出来的明文", async () 
 
     assert.equal(session.sip.uri, "sip:p8001@sip.example.test");
     assert.equal(session.sip.registerTicket, "sip-password");
+    // 会话里坐席 extension 用请求带的分机号，不再用账号名
+    assert.equal(session.agent.extension, "8001");
     assert.equal(session.transport.wssUrl, "wss://sip.example.test:7443/api/fs/sip-ws?token=fs-token");
     // 旧平台的凭据在 URL 上，没有 ticket 子协议
     assert.equal(session.transport.ticket, "");

@@ -2,7 +2,7 @@
 
 手机浏览器 / App WebView 里的坐席条示例：**Vue 3 + 拨号盘 + 日志抽屉**。界面形态对齐 `@16x/webphone-sdk` 自带的移动端视图（`ccbar-web-sdk/src/ui/views/renderMobile.ts`），业务逻辑与桌面版示例 `D:\code\ccbar-vue-demo` 共用同一套约定（会话契约、状态文案、首通保护）。
 
-**自带本地后端**：`server/` 里是从桌面 demo 搬过来的 Token 代理（会话 + 坐席状态 + fs token），`npm run dev` 会把页面和它一起起来，不用再开第二个项目。上线/接客户后端时换掉 `TOKEN_PROXY_ORIGIN` 即可，见「会话从哪来」。
+**自带本地后端**：`server/` 里是从桌面 demo 搬过来的 Token 代理（会话 + 取票），`npm run dev` 会把页面和它一起起来，不用再开第二个项目。坐席状态由 SDK 从浏览器直接打平台接口，换票走同源 `/get-token`（服务端加签，SECRET 不下发）。上线/接客户后端时换掉 `TOKEN_PROXY_ORIGIN` 即可，见「会话从哪来」。
 
 ## 跑起来
 
@@ -34,7 +34,7 @@ npm run dev
 | 挂断 | `call.hangup()` |
 | 接听 / 拒接 | 来电全屏浮层（同时振动）→ `client.answer(callId)` / `call.reject({ reason })` |
 | 空闲 / 休息 | `client.setAgentStatus('available' \| 'break')` |
-| 置忙 | 页面直接调同源 `/set-agent-status`（SDK 的 `setAgentStatus` 没有 busy 取值，平台侧是 On Break + reason=忙碌） |
+| 置忙 | 直接调会话来源的 `setAgentStatus`（SDK 的 `client.setAgentStatus` 没有 busy 取值，平台侧是 On Break + reason=忙碌，由 npm 包里的实现直连平台） |
 
 按钮统一带 busy / 连接 / 号码条件禁用；`dial` / `answer` 在未连接时**同步抛错**，都包在 `run()` 里。
 
@@ -84,7 +84,12 @@ policy: {
 页面 ──sessionProvider.createSession()──▶ SDK ──▶ 连 WSS、发 REGISTER（注册分机）
 ```
 
-- **换地址**：`.env` 里 `TOKEN_PROXY_ORIGIN=https://你们的网关`；或让页面直连你们自己的后端，用 `VITE_SESSION_API` / `VITE_AGENT_STATUS_API`（需要对方开 CORS 并允许携带 Cookie）。
+**坐席状态不走服务端路由**：SDK 的 legacy 实现（`@16x/webphone-sdk/legacy` 的 `createLegacySessionProvider`）
+从浏览器直接打平台的 `seat/account/get` + `seats/set-status`；换票时页面打同源 `/get-token`，
+由服务端加签（API SECRET 不下发）。注意 SDK 4.x 每次切状态都会换票（不象 3.1.x 那样复用会话软电话
+地址里的 token），服务端 `getFsToken` 自带 120 秒缓存，实际不会重复取票。
+
+- **换地址**：`.env` 里 `TOKEN_PROXY_ORIGIN=https://你们的网关`；或让页面直连你们自己的后端，用 `VITE_SESSION_API` / `VITE_TOKEN_API`（需要对方开 CORS 并允许携带 Cookie）。
 - **接口契约、AES 解密、部署反代、排障表**都写在桌面 demo 的文档里：`D:\code\ccbar-vue-demo\docs\前端接入文档.md`；两条平台接口的加签与拼装细节见本仓库 `docs/会话服务实现指南.md`，后端这段逻辑怎么组织见 `docs/会话服务后端逻辑.md`。两边共用同一套契约，这里不重复，只写 H5 的差异。
 
 ## 部署
@@ -94,7 +99,8 @@ policy: {
 | 路径 | 转发到 |
 |---|---|
 | `/get-session` | 本仓库的 `server/token-server.js`（`npm run token-server`，或你们自己的会话服务） |
-| `/set-agent-status` | 同上（空闲 / 置忙 / 休息 / 退签） |
+| `/get-token` | 同上（坐席状态换票的口子，服务端加签） |
+| `/set-agent-status` | 兼容旧页面 / 本地排障才用（新页面已改由 SDK 直连平台） |
 
 ## 已知环境行为
 
@@ -120,10 +126,10 @@ src/lib/sipDebug.ts      SIP 原文：打开 JsSIP debug 并接住 console
 src/lib/logs.ts          日志格式化与状态文案（纯函数，有单测）
 src/lib/helpers.ts       地址校验、分机前缀处理
 server/dev.mjs           一次起两个进程：Token 代理(3100) + Vite(5174)
-server/token-server.js   HTTP 服务：/get-session、/set-agent-status、/health
+server/token-server.js   HTTP 服务：/get-session、/get-token、/set-agent-status（兼容）、/health
 server/get-session.js    token/fs → seat/account/get → 解出 SIP 密码 → 拼会话
 server/get-token.js      fs token（X-Ca 签名 + 缓存）
-server/set-agent-status.js  坐席状态 → 平台 seats/set-status
+server/set-agent-status.js  坐席状态 → 平台 seats/set-status（兼容旧页面，新页面由 SDK 直连）
 ```
 
 > `src/lib/`（除 `usePhone.ts`）和整个 `server/` 都是从桌面 demo 原样搬过来的，表现层才是 H5 的差异。改这些共用文件时建议两边同步，尤其是 `logs.ts` 的文案、`callRetry.ts` 的重拨节奏、以及 `server/` 里的接口路径。
